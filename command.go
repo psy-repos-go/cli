@@ -189,7 +189,7 @@ func (cmd *Command) setupDefaults(osArgs []string) {
 
 	if cmd.ShellComplete == nil {
 		tracef("setting default ShellComplete (cmd=%[1]q)", cmd.Name)
-		cmd.ShellComplete = DefaultCompleteWithFlags(cmd)
+		cmd.ShellComplete = DefaultCompleteWithFlags
 	}
 
 	if cmd.Name == "" && isRoot {
@@ -797,12 +797,6 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 	tracef("parsing flags iteratively tail=%[1]q (cmd=%[2]q)", args.Tail(), cmd.Name)
 
 	if err := parseIter(cmd.flagSet, cmd, args.Tail(), cmd.Root().shellCompletion); err != nil {
-		return cmd.Args(), err
-	}
-
-	tracef("normalizing flags (cmd=%[1]q)", cmd.Name)
-
-	if err := normalizeFlags(cmd.Flags, cmd.flagSet); err != nil {
 		return cmd.Args(), err
 	}
 

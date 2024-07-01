@@ -65,6 +65,36 @@ func Test_ShowAppHelp_MultiLineDescription(t *testing.T) {
 	}
 }
 
+func Test_Help_RequiredFlagsNoDefault(t *testing.T) {
+	output := new(bytes.Buffer)
+
+	cmd := &Command{
+		Flags: []Flag{
+			&IntFlag{Name: "foo", Aliases: []string{"f"}, Required: true},
+		},
+		Writer: output,
+	}
+
+	_ = cmd.Run(buildTestContext(t), []string{"test", "-h"})
+
+	expected := `NAME:
+   test - A new cli application
+
+USAGE:
+   test [global options] [command [command options]] [arguments...]
+
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --foo value, -f value  
+   --help, -h             show help
+`
+
+	assert.Contains(t, output.String(), expected,
+		"expected output to include usage text")
+}
+
 func Test_Help_Custom_Flags(t *testing.T) {
 	oldFlag := HelpFlag
 	defer func() {
@@ -1080,18 +1110,18 @@ func TestDefaultCompleteWithFlags(t *testing.T) {
 	origArgv := os.Args
 	t.Cleanup(func() { os.Args = origArgv })
 
-	t.Setenv("SHELL", "bash")
-
 	for _, tc := range []struct {
 		name     string
 		cmd      *Command
 		argv     []string
+		env      map[string]string
 		expected string
 	}{
 		{
 			name:     "empty",
 			cmd:      &Command{},
 			argv:     []string{"prog", "cmd"},
+			env:      map[string]string{"SHELL": "bash"},
 			expected: "",
 		},
 		{
@@ -1113,6 +1143,7 @@ func TestDefaultCompleteWithFlags(t *testing.T) {
 				},
 			},
 			argv:     []string{"cmd", "--e", "--generate-shell-completion"},
+			env:      map[string]string{"SHELL": "bash"},
 			expected: "--excitement\n",
 		},
 		{
@@ -1135,6 +1166,7 @@ func TestDefaultCompleteWithFlags(t *testing.T) {
 				},
 			},
 			argv:     []string{"cmd", "--generate-shell-completion"},
+			env:      map[string]string{"SHELL": "bash"},
 			expected: "futz\n",
 		},
 		{
@@ -1157,7 +1189,48 @@ func TestDefaultCompleteWithFlags(t *testing.T) {
 				},
 			},
 			argv:     []string{"cmd", "--url", "http://localhost:8000", "h", "--generate-shell-completion"},
+			env:      map[string]string{"SHELL": "bash"},
 			expected: "help\n",
+		},
+		{
+			name: "zsh-autocomplete-with-flag-descriptions",
+			cmd: &Command{
+				Name: "putz",
+				Flags: []Flag{
+					&BoolFlag{Name: "excitement", Usage: "an exciting flag"},
+					&StringFlag{Name: "hat-shape"},
+				},
+				parent: &Command{
+					Name: "cmd",
+					Flags: []Flag{
+						&BoolFlag{Name: "happiness"},
+						&IntFlag{Name: "everybody-jump-on"},
+					},
+				},
+			},
+			argv:     []string{"cmd", "putz", "-e", "--generate-shell-completion"},
+			env:      map[string]string{"SHELL": "zsh"},
+			expected: "--excitement:an exciting flag\n",
+		},
+		{
+			name: "zsh-autocomplete-with-empty-flag-descriptions",
+			cmd: &Command{
+				Name: "putz",
+				Flags: []Flag{
+					&BoolFlag{Name: "excitement"},
+					&StringFlag{Name: "hat-shape"},
+				},
+				parent: &Command{
+					Name: "cmd",
+					Flags: []Flag{
+						&BoolFlag{Name: "happiness"},
+						&IntFlag{Name: "everybody-jump-on"},
+					},
+				},
+			},
+			argv:     []string{"cmd", "putz", "-e", "--generate-shell-completion"},
+			env:      map[string]string{"SHELL": "zsh"},
+			expected: "--excitement\n",
 		},
 	} {
 		t.Run(tc.name, func(ct *testing.T) {
@@ -1166,7 +1239,10 @@ func TestDefaultCompleteWithFlags(t *testing.T) {
 			rootCmd.Writer = writer
 
 			os.Args = tc.argv
-			f := DefaultCompleteWithFlags(tc.cmd)
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			f := DefaultCompleteWithFlags
 			f(context.Background(), tc.cmd)
 
 			written := writer.String()
@@ -1352,8 +1428,7 @@ COMMANDS:
             for one command
 
 OPTIONS:
-   --help, -h show help
-      (default: false)
+   --help, -h  show help
 `,
 		output.String(),
 	)
@@ -1418,8 +1493,7 @@ USAGE:
    even more
 
 OPTIONS:
-   --help, -h show help
-      (default: false)
+   --help, -h  show help
 `
 
 	assert.Equal(t, expected, output.String(), "Unexpected wrapping")
@@ -1499,8 +1573,7 @@ COMMANDS:
 OPTIONS:
    --test-f value my test
       usage
-   --help, -h show help
-      (default: false)
+   --help, -h  show help
 `,
 		output.String(),
 	)
@@ -1578,7 +1651,7 @@ COMMANDS:
             for one command
 
 GLOBAL OPTIONS:
-   --help, -h    show help (default: false)
+   --help, -h    show help
    --m2 value    
    --strd value  
 
@@ -1588,4 +1661,69 @@ GLOBAL OPTIONS:
    --m1 value                                  
 
 `, output.String())
+}
+
+func Test_checkShellCompleteFlag(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name                string
+		cmd                 *Command
+		arguments           []string
+		wantShellCompletion bool
+		wantArgs            []string
+	}{
+		{
+			name:                "disable-shell-completion",
+			arguments:           []string{"--generate-shell-completion"},
+			cmd:                 &Command{},
+			wantShellCompletion: false,
+			wantArgs:            []string{"--generate-shell-completion"},
+		},
+		{
+			name:      "child-disable-shell-completion",
+			arguments: []string{"--generate-shell-completion"},
+			cmd: &Command{
+				parent: &Command{},
+			},
+			wantShellCompletion: false,
+			wantArgs:            []string{"--generate-shell-completion"},
+		},
+		{
+			name:      "last argument isn't --generate-shell-completion",
+			arguments: []string{"foo"},
+			cmd: &Command{
+				EnableShellCompletion: true,
+			},
+			wantShellCompletion: false,
+			wantArgs:            []string{"foo"},
+		},
+		{
+			name:      "arguments include double dash",
+			arguments: []string{"--", "foo", "--generate-shell-completion"},
+			cmd: &Command{
+				EnableShellCompletion: true,
+			},
+			wantShellCompletion: false,
+			wantArgs:            []string{"--", "foo", "--generate-shell-completion"},
+		},
+		{
+			name:      "shell completion",
+			arguments: []string{"foo", "--generate-shell-completion"},
+			cmd: &Command{
+				EnableShellCompletion: true,
+			},
+			wantShellCompletion: true,
+			wantArgs:            []string{"foo"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			shellCompletion, args := checkShellCompleteFlag(tt.cmd, tt.arguments)
+			assert.Equal(t, tt.wantShellCompletion, shellCompletion)
+			assert.Equal(t, tt.wantArgs, args)
+		})
+	}
 }

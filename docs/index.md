@@ -4,7 +4,7 @@ https://github.com/urfave/cli/blob/main/README.md
 -->
 # Welcome to urfave/cli
 
-[![Run Tests](https://github.com/urfave/cli/actions/workflows/cli.yml/badge.svg)](https://github.com/urfave/cli/actions/workflows/cli.yml)
+[![Run Tests](https://github.com/urfave/cli/actions/workflows/test.yml/badge.svg)](https://github.com/urfave/cli/actions/workflows/test.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/urfave/cli/v3.svg)](https://pkg.go.dev/github.com/urfave/cli/v3)
 [![Go Report Card](https://goreportcard.com/badge/github.com/urfave/cli/v3)](https://goreportcard.com/report/github.com/urfave/cli/v3)
 [![codecov](https://codecov.io/gh/urfave/cli/branch/main/graph/badge.svg?token=t9YGWLh05g)](https://codecov.io/gh/urfave/cli)
@@ -40,7 +40,7 @@ In addition to the version-specific guides, these other documents are available:
 
 ## Installation
 
-Using this package requires a working Go environment. [See the install instructions for Go](http://golang.org/doc/install.html).
+Using this package requires a working Go environment. [See the install instructions for Go](https://go.dev/doc/install).
 
 Go Modules are required when using this package. [See the go blog guide on using Go Modules](https://blog.golang.org/using-go-modules).
 
@@ -94,4 +94,4 @@ cli is tested against multiple versions of Go on Linux, and against the latest
 released version of Go on OS X and Windows. This project uses GitHub Actions
 for builds. To see our currently supported go versions and platforms, look at
 the [github workflow
-configuration](https://github.com/urfave/cli/blob/main/.github/workflows/cli.yml).
+configuration](https://github.com/urfave/cli/blob/main/.github/workflows/test.yml).
